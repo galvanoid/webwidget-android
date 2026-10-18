@@ -1,0 +1,1 @@
+WebWidget Android: introduce una URL HTTPS, navega en la app y captura la vista actual en un widget de inicio redimensionable. El widget muestra una imagen, no una web interactiva. La actualización de la captura requiere abrir la app; Android no permite capturar un WebView arbitrario en segundo plano de manera fiable. APK: Actions > Build APK > artifact WebWidget-APK.
