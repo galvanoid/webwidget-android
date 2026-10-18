@@ -1,0 +1,82 @@
+package es.webwidget;
+import android.content.Context;
+import android.content.SharedPreferences;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.os.Handler;
+import android.os.Looper;
+import android.view.View;
+import android.webkit.WebSettings;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
+import androidx.annotation.NonNull;
+import androidx.work.Worker;
+import androidx.work.WorkerParameters;
+import androidx.work.PeriodicWorkRequest;
+import androidx.work.ExistingPeriodicWorkPolicy;
+import androidx.work.WorkManager;
+import java.io.FileOutputStream;
+import java.util.Locale;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+
+public class RefreshWorker extends Worker {
+ static final String WORK_NAME="webwidget-periodic-capture";
+ public RefreshWorker(@NonNull Context c,@NonNull WorkerParameters p){super(c,p);}
+ public static void schedule(Context context){
+  int minutes=context.getSharedPreferences("MainActivity",Context.MODE_PRIVATE).getInt("interval",30);
+  if(minutes==0){WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME);return;}
+  PeriodicWorkRequest request=new PeriodicWorkRequest.Builder(RefreshWorker.class,Math.max(15,minutes),TimeUnit.MINUTES).build();
+  WorkManager.getInstance(context).enqueueUniquePeriodicWork(WORK_NAME,ExistingPeriodicWorkPolicy.CANCEL_AND_REENQUEUE,request);
+ }
+ @NonNull @Override public Result doWork(){
+  Context context=getApplicationContext();
+  SharedPreferences prefs=context.getSharedPreferences("MainActivity",Context.MODE_PRIVATE);
+  String url=prefs.getString("url","https://example.com");
+  boolean desktop=prefs.getBoolean("desktop",false);
+  int zoom=prefs.getInt("zoom",100);
+  CountDownLatch latch=new CountDownLatch(1);
+  Handler main=new Handler(Looper.getMainLooper());
+  final WebView[] view=new WebView[1];
+  final boolean[] saved={false};
+  main.post(()->{
+   try{
+    WebView web=new WebView(context);view[0]=web;
+    web.setBackgroundColor(Color.WHITE);
+    WebSettings settings=web.getSettings();
+    settings.setJavaScriptEnabled(true);settings.setDomStorageEnabled(true);
+    settings.setUseWideViewPort(desktop);settings.setLoadWithOverviewMode(desktop);
+    if(desktop)settings.setUserAgentString("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+    int width=(int)(context.getResources().getDisplayMetrics().widthPixels);
+    int height=(int)(context.getResources().getDisplayMetrics().heightPixels*0.70f);
+    width=Math.max(320,width);height=Math.max(400,height);
+    web.measure(View.MeasureSpec.makeMeasureSpec(width,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(height,View.MeasureSpec.EXACTLY));
+    web.layout(0,0,width,height);
+    web.setWebViewClient(new WebViewClient(){
+     @Override public void onPageFinished(WebView v,String page){
+      String viewport=desktop?"width=1280, initial-scale=1":"width=device-width, initial-scale=1";
+      String script="(function(){var m=document.querySelector('meta[name=viewport]');if(!m){m=document.createElement('meta');m.name='viewport';document.head.appendChild(m);}m.setAttribute('content','"+viewport+"');var st=document.getElementById('webwidget-zoom');if(!st){st=document.createElement('style');st.id='webwidget-zoom';document.head.appendChild(st);}st.textContent='html{zoom:"+String.format(Locale.US,"%.2f",zoom/100f)+" !important;}';})();";
+      v.evaluateJavascript(script,x->main.postDelayed(()->{
+       try{
+        int w=Math.min(800,width),h=Math.max(1,Math.round(height*(w/(float)width)));
+        Bitmap bmp=Bitmap.createBitmap(w,h,Bitmap.Config.RGB_565);
+        Canvas canvas=new Canvas(bmp);canvas.scale(w/(float)width,h/(float)height);v.draw(canvas);
+        try(FileOutputStream out=context.openFileOutput("snapshot.png",Context.MODE_PRIVATE)){
+         saved[0]=bmp.compress(Bitmap.CompressFormat.PNG,100,out);
+        }
+        bmp.recycle();
+        if(saved[0])WidgetProvider.refresh(context);
+       }catch(Exception ignored){}finally{latch.countDown();}
+      },3000));
+     }
+    });
+    web.loadUrl(url);
+   }catch(Exception e){latch.countDown();}
+  });
+  try{if(!latch.await(45,TimeUnit.SECONDS))return Result.retry();}
+  catch(InterruptedException e){Thread.currentThread().interrupt();return Result.retry();}
+  finally{main.post(()->{if(view[0]!=null)view[0].destroy();});}
+  return saved[0]?Result.success():Result.retry();
+ }
+}
