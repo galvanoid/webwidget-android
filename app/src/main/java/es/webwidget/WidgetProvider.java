@@ -19,6 +19,7 @@ public class WidgetProvider extends AppWidgetProvider {
  }
  static void render(Context c,AppWidgetManager manager,int id) {
   RemoteViews rv=new RemoteViews(c.getPackageName(),R.layout.widget);
+  rv.setInt(R.id.widget_root,"setBackgroundColor",c.getSharedPreferences("MainActivity",Context.MODE_PRIVATE).getInt("background",android.graphics.Color.WHITE));
   File file=new File(c.getFilesDir(),"snapshot.png");
   Bitmap bitmap=BitmapFactory.decodeFile(file.getAbsolutePath());
   if(bitmap!=null){rv.setImageViewBitmap(R.id.screenshot,bitmap);rv.setViewVisibility(R.id.empty,View.GONE);}
