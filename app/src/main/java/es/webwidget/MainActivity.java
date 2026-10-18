@@ -25,7 +25,7 @@ public class MainActivity extends Activity {
  int zoomPercent;
  boolean desktopMode;
  String mobileUserAgent;
- Button modeButton, colorButton;
+ Button modeButton, colorButton, refreshButton;
  @Override public void onCreate(Bundle state) {
   super.onCreate(state);
   currentUrl=getPreferences(0).getString("url","https://example.com");
@@ -44,6 +44,10 @@ public class MainActivity extends Activity {
   colorButton=new Button(this);colorButton.setText("Fondo del widget");
   root.addView(colorButton,new LinearLayout.LayoutParams(-1,-2));
   colorButton.setOnClickListener(v->showBackgroundDialog());
+  refreshButton=new Button(this);refreshButton.setText("Actualización automática");
+  root.addView(refreshButton,new LinearLayout.LayoutParams(-1,-2));
+  refreshButton.setOnClickListener(v->showRefreshDialog());
+  RefreshWorker.schedule(this);
   LinearLayout zoomControls=new LinearLayout(this);zoomControls.setOrientation(LinearLayout.HORIZONTAL);
   zoomLabel=new TextView(this);zoomLabel.setTextColor(Color.BLACK);zoomLabel.setPadding(12,12,8,0);
   zoomBar=new SeekBar(this);zoomBar.setMax(170);zoomBar.setProgress(Math.max(0,Math.min(170,zoomPercent-30)));
@@ -93,6 +97,20 @@ public class MainActivity extends Activity {
    ? "(function(){var m=document.querySelector('meta[name=viewport]');if(!m){m=document.createElement('meta');m.name='viewport';document.head.appendChild(m);}m.setAttribute('content','width=1280, initial-scale=1, minimum-scale=0.1, maximum-scale=5, user-scalable=yes');})();"
    : "(function(){var m=document.querySelector('meta[name=viewport]');if(m){m.setAttribute('content','width=device-width, initial-scale=1');}})();";
   web.evaluateJavascript(script,null);
+ }
+ void showRefreshDialog(){
+  final String[] options={"Desactivada","Cada 15 minutos","Cada 30 minutos","Cada 60 minutos","Cada 2 horas"};
+  final int[] values={0,15,30,60,120};
+  int selected=getPreferences(0).getInt("interval",30);
+  int checked=2;
+  for(int i=0;i<values.length;i++)if(values[i]==selected)checked=i;
+  new AlertDialog.Builder(this).setTitle("Actualización automática")
+   .setSingleChoiceItems(options,checked,(dialog,which)->{
+    getPreferences(0).edit().putInt("interval",values[which]).apply();
+    RefreshWorker.schedule(this);
+    Toast.makeText(this,"Frecuencia: "+options[which],Toast.LENGTH_LONG).show();
+    dialog.dismiss();
+   }).setNegativeButton("Cancelar",null).show();
  }
  void showBackgroundDialog(){
   final String[] labels={"Negro","Blanco","Gris oscuro","Gris claro","Azul oscuro","Transparente"};
