@@ -25,7 +25,7 @@ public class MainActivity extends Activity {
  int zoomPercent;
  boolean desktopMode;
  String mobileUserAgent;
- Button modeButton;
+ Button modeButton, colorButton;
  @Override public void onCreate(Bundle state) {
   super.onCreate(state);
   currentUrl=getPreferences(0).getString("url","https://example.com");
@@ -41,6 +41,9 @@ public class MainActivity extends Activity {
   modeButton=new Button(this);
   modeButton.setText(desktopMode?"Vista: escritorio":"Vista: móvil");
   root.addView(modeButton,new LinearLayout.LayoutParams(-1,-2));
+  colorButton=new Button(this);colorButton.setText("Fondo del widget");
+  root.addView(colorButton,new LinearLayout.LayoutParams(-1,-2));
+  colorButton.setOnClickListener(v->showBackgroundDialog());
   LinearLayout zoomControls=new LinearLayout(this);zoomControls.setOrientation(LinearLayout.HORIZONTAL);
   zoomLabel=new TextView(this);zoomLabel.setTextColor(Color.BLACK);zoomLabel.setPadding(12,12,8,0);
   zoomBar=new SeekBar(this);zoomBar.setMax(170);zoomBar.setProgress(Math.max(0,Math.min(170,zoomPercent-30)));
@@ -52,7 +55,7 @@ public class MainActivity extends Activity {
   web.getSettings().setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
   mobileUserAgent=web.getSettings().getUserAgentString();
   configureMode();
-  web.setWebViewClient(new WebViewClient(){@Override public void onPageFinished(WebView v,String s){applyZoom();handler.postDelayed(()->snapshot(),2500);}});
+  web.setWebViewClient(new WebViewClient(){@Override public void onPageFinished(WebView v,String s){applyViewport();handler.postDelayed(()->{applyZoom();snapshot();},1800);}});
   root.addView(web,new LinearLayout.LayoutParams(-1,0,1));setContentView(root);
   change.setOnClickListener(v->showUrlDialog());
   address.setOnClickListener(v->showUrlDialog());
@@ -62,7 +65,7 @@ public class MainActivity extends Activity {
    getPreferences(0).edit().putBoolean("desktop",desktopMode).apply();
    modeButton.setText(desktopMode?"Vista: escritorio":"Vista: móvil");
    configureMode();
-   web.reload();
+   web.loadUrl(currentUrl);
   });
   zoomBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){
    public void onProgressChanged(SeekBar b,int progress,boolean user){
@@ -84,6 +87,21 @@ public class MainActivity extends Activity {
   }else{
    settings.setUserAgentString(mobileUserAgent);
   }
+ }
+ void applyViewport(){
+  String script=desktopMode
+   ? "(function(){var m=document.querySelector('meta[name=viewport]');if(!m){m=document.createElement('meta');m.name='viewport';document.head.appendChild(m);}m.setAttribute('content','width=1280, initial-scale=1, minimum-scale=0.1, maximum-scale=5, user-scalable=yes');})();"
+   : "(function(){var m=document.querySelector('meta[name=viewport]');if(m){m.setAttribute('content','width=device-width, initial-scale=1');}})();";
+  web.evaluateJavascript(script,null);
+ }
+ void showBackgroundDialog(){
+  final String[] labels={"Negro","Blanco","Gris oscuro","Gris claro","Azul oscuro","Transparente"};
+  final int[] colors={Color.BLACK,Color.WHITE,Color.rgb(36,39,45),Color.rgb(225,228,232),Color.rgb(18,34,59),Color.TRANSPARENT};
+  new AlertDialog.Builder(this).setTitle("Color del fondo del widget").setItems(labels,(d,which)->{
+   getPreferences(0).edit().putInt("background",colors[which]).apply();
+   WidgetProvider.refresh(this);
+   Toast.makeText(this,"Fondo: "+labels[which],Toast.LENGTH_SHORT).show();
+  }).show();
  }
  void applyZoom(){
   if(web==null)return;
