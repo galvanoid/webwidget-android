@@ -48,9 +48,8 @@ public class RefreshWorker extends Worker {
     settings.setJavaScriptEnabled(true);settings.setDomStorageEnabled(true);
     settings.setUseWideViewPort(desktop);settings.setLoadWithOverviewMode(desktop);
     if(desktop)settings.setUserAgentString("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
-    int width=(int)(context.getResources().getDisplayMetrics().widthPixels);
-    int height=(int)(context.getResources().getDisplayMetrics().heightPixels*0.70f);
-    width=Math.max(320,width);height=Math.max(400,height);
+    final int width=Math.max(320,context.getResources().getDisplayMetrics().widthPixels);
+    final int height=Math.max(400,(int)(context.getResources().getDisplayMetrics().heightPixels*0.70f));
     web.measure(View.MeasureSpec.makeMeasureSpec(width,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(height,View.MeasureSpec.EXACTLY));
     web.layout(0,0,width,height);
     web.setWebViewClient(new WebViewClient(){
