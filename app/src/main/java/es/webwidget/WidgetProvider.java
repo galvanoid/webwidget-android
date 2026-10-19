@@ -28,7 +28,10 @@ public class WidgetProvider extends AppWidgetProvider {
   String url=c.getSharedPreferences("MainActivity",Context.MODE_PRIVATE).getString("url","https://example.com");
   Intent intent=new Intent(Intent.ACTION_VIEW,Uri.parse(url));
   intent.addCategory(Intent.CATEGORY_BROWSABLE);
-  PendingIntent pending=PendingIntent.getActivity(c,id,intent,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
+  intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+  // A distinct request code prevents reuse of the older MainActivity PendingIntent.
+  PendingIntent pending=PendingIntent.getActivity(c,100000+id,intent,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
+  rv.setOnClickPendingIntent(R.id.widget_root,pending);
   rv.setOnClickPendingIntent(R.id.screenshot,pending);
   rv.setOnClickPendingIntent(R.id.empty,pending);
   manager.updateAppWidget(id,rv);
