@@ -30,7 +30,6 @@ public class MainActivity extends Activity {
  Button modeButton, colorButton, refreshButton;
  Spinner widgetSelector;
  int widgetId=AppWidgetManager.INVALID_APPWIDGET_ID;
- boolean selecting=false;
  SharedPreferences settings(){return WidgetSettings.forId(this,widgetId);}
  @Override public void onCreate(Bundle state) {
   super.onCreate(state);
@@ -40,7 +39,7 @@ public class MainActivity extends Activity {
   WidgetSettings.ensure(this,widgetId);
   currentUrl=settings().getString("url","https://example.com");
   zoomPercent=settings().getInt("zoom",100);
-  desktopMode=getPreferences(0).getBoolean("desktop",false);
+  desktopMode=settings().getBoolean("desktop",false);
   LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setBackgroundColor(Color.WHITE);
   widgetSelector=new Spinner(this);
   root.addView(widgetSelector,new LinearLayout.LayoutParams(-1,-2));
@@ -78,7 +77,7 @@ public class MainActivity extends Activity {
   capture.setOnClickListener(v->snapshot());
   modeButton.setOnClickListener(v->{
    desktopMode=!desktopMode;
-   getPreferences(0).edit().putBoolean("desktop",desktopMode).apply();
+   settings().edit().putBoolean("desktop",desktopMode).apply();
    modeButton.setText(desktopMode?"Vista: escritorio":"Vista: móvil");
    configureMode();
    web.loadUrl(currentUrl);
@@ -86,7 +85,7 @@ public class MainActivity extends Activity {
   zoomBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){
    public void onProgressChanged(SeekBar b,int progress,boolean user){
     zoomPercent=progress+30;zoomLabel.setText("Zoom "+zoomPercent+"%");
-    if(user){getPreferences(0).edit().putInt("zoom",zoomPercent).apply();applyZoom();}
+    if(user){settings().edit().putInt("zoom",zoomPercent).apply();applyZoom();}
    }
    public void onStartTrackingTouch(SeekBar b){}
    public void onStopTrackingTouch(SeekBar b){snapshot();}
@@ -132,12 +131,12 @@ public class MainActivity extends Activity {
  void showRefreshDialog(){
   final String[] options={"Desactivada","Cada 15 minutos","Cada 30 minutos","Cada 60 minutos","Cada 2 horas"};
   final int[] values={0,15,30,60,120};
-  int selected=getPreferences(0).getInt("interval",30);
+  int selected=settings().getInt("interval",30);
   int checked=2;
   for(int i=0;i<values.length;i++)if(values[i]==selected)checked=i;
   new AlertDialog.Builder(this).setTitle("Actualización automática")
    .setSingleChoiceItems(options,checked,(dialog,which)->{
-    getPreferences(0).edit().putInt("interval",values[which]).apply();
+    settings().edit().putInt("interval",values[which]).apply();
     RefreshWorker.schedule(this,widgetId);
     Toast.makeText(this,"Frecuencia: "+options[which],Toast.LENGTH_LONG).show();
     dialog.dismiss();
@@ -147,7 +146,7 @@ public class MainActivity extends Activity {
   final String[] labels={"Negro","Blanco","Gris oscuro","Gris claro","Azul oscuro","Transparente"};
   final int[] colors={Color.BLACK,Color.WHITE,Color.rgb(36,39,45),Color.rgb(225,228,232),Color.rgb(18,34,59),Color.TRANSPARENT};
   new AlertDialog.Builder(this).setTitle("Color del fondo del widget").setItems(labels,(d,which)->{
-   getPreferences(0).edit().putInt("background",colors[which]).apply();
+   settings().edit().putInt("background",colors[which]).apply();
    WidgetProvider.refresh(this);
    Toast.makeText(this,"Fondo: "+labels[which],Toast.LENGTH_SHORT).show();
   }).show();
@@ -159,6 +158,7 @@ public class MainActivity extends Activity {
   final float scale=zoomPercent/100f;
   web.evaluateJavascript("(function(){var id='webwidget-zoom';var st=document.getElementById(id);if(!st){st=document.createElement('style');st.id=id;document.head.appendChild(st);}st.textContent='html{zoom:"+String.format(Locale.US,"%.2f",scale)+" !important;}';})();",null);
  }
+ int[] idsForSelector(){return WidgetSettings.ids(this);}
  void showUrlDialog(){
   EditText input=new EditText(this);
   input.setSingleLine(true);input.setSelectAllOnFocus(true);
@@ -170,7 +170,10 @@ public class MainActivity extends Activity {
    .setPositiveButton("Guardar y abrir",(d,w)->{
     String u=input.getText().toString().trim();
     if(!(u.startsWith("https://")||u.startsWith("http://"))){Toast.makeText(this,"La URL debe empezar por http:// o https://",Toast.LENGTH_LONG).show();return;}
-    currentUrl=u;getPreferences(0).edit().putString("url",u).apply();address.setText(u);web.loadUrl(u);
+    currentUrl=u;settings().edit().putString("url",u).apply();address.setText(u);
+    int pos=widgetSelector.getSelectedItemPosition();
+    if(pos>=0){String[] labels=new String[idsForSelector().length];int[] widgetIds=idsForSelector();for(int i=0;i<labels.length;i++)labels[i]="Widget "+(i+1)+" — "+WidgetSettings.forId(this,widgetIds[i]).getString("url","https://example.com");widgetSelector.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,labels));widgetSelector.setSelection(pos);}
+    WidgetProvider.refresh(this);web.loadUrl(u);
    }).create();
   dialog.show();input.requestFocus();input.selectAll();
  }
@@ -190,5 +193,5 @@ public class MainActivity extends Activity {
   }catch(Exception e){Toast.makeText(this,"Error al guardar captura",Toast.LENGTH_LONG).show();}
   bitmap.recycle();
  }
- @Override protected void onDestroy(){web.destroy();super.onDestroy();}
+ @Override protected void onDestroy(){if(web!=null)web.destroy();super.onDestroy();}
 }
