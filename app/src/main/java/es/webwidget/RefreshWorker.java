@@ -16,23 +16,33 @@ import androidx.work.WorkerParameters;
 import androidx.work.PeriodicWorkRequest;
 import androidx.work.ExistingPeriodicWorkPolicy;
 import androidx.work.WorkManager;
+import androidx.work.Data;
+import android.appwidget.AppWidgetManager;
 import java.io.FileOutputStream;
 import java.util.Locale;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 public class RefreshWorker extends Worker {
- static final String WORK_NAME="webwidget-periodic-capture";
+ static final String WORK_NAME="webwidget-periodic-capture-";
+ static String workName(int id){return WORK_NAME+id;}
  public RefreshWorker(@NonNull Context c,@NonNull WorkerParameters p){super(c,p);}
- public static void schedule(Context context){
-  int minutes=context.getSharedPreferences("MainActivity",Context.MODE_PRIVATE).getInt("interval",30);
-  if(minutes==0){WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME);return;}
-  PeriodicWorkRequest request=new PeriodicWorkRequest.Builder(RefreshWorker.class,Math.max(15,minutes),TimeUnit.MINUTES).build();
-  WorkManager.getInstance(context).enqueueUniquePeriodicWork(WORK_NAME,ExistingPeriodicWorkPolicy.CANCEL_AND_REENQUEUE,request);
+ public static void schedule(Context context,int id){
+  WidgetSettings.ensure(context,id);
+  int minutes=WidgetSettings.forId(context,id).getInt("interval",30);
+  if(minutes==0){WorkManager.getInstance(context).cancelUniqueWork(workName(id));return;}
+  Data data=new Data.Builder().putInt("widget_id",id).build();
+  PeriodicWorkRequest request=new PeriodicWorkRequest.Builder(RefreshWorker.class,Math.max(15,minutes),TimeUnit.MINUTES).setInputData(data).build();
+  WorkManager.getInstance(context).enqueueUniquePeriodicWork(workName(id),ExistingPeriodicWorkPolicy.CANCEL_AND_REENQUEUE,request);
  }
+ public static void cancel(Context context,int id){WorkManager.getInstance(context).cancelUniqueWork(workName(id));}
  @NonNull @Override public Result doWork(){
   Context context=getApplicationContext();
-  SharedPreferences prefs=context.getSharedPreferences("MainActivity",Context.MODE_PRIVATE);
+  int id=getInputData().getInt("widget_id",AppWidgetManager.INVALID_APPWIDGET_ID);
+  if(id==AppWidgetManager.INVALID_APPWIDGET_ID)return Result.failure();
+  boolean exists=false;for(int active:WidgetSettings.ids(context))if(active==id){exists=true;break;}
+  if(!exists)return Result.success();
+  SharedPreferences prefs=WidgetSettings.forId(context,id);
   String url=prefs.getString("url","https://example.com");
   boolean desktop=prefs.getBoolean("desktop",false);
   int zoom=prefs.getInt("zoom",100);
@@ -61,7 +71,7 @@ public class RefreshWorker extends Worker {
         int w=Math.min(800,width),h=Math.max(1,Math.round(height*(w/(float)width)));
         Bitmap bmp=Bitmap.createBitmap(w,h,Bitmap.Config.RGB_565);
         Canvas canvas=new Canvas(bmp);canvas.scale(w/(float)width,h/(float)height);v.draw(canvas);
-        try(FileOutputStream out=context.openFileOutput("snapshot.png",Context.MODE_PRIVATE)){
+        try(FileOutputStream out=context.openFileOutput(WidgetSettings.snapshotName(id),Context.MODE_PRIVATE)){
          saved[0]=bmp.compress(Bitmap.CompressFormat.PNG,100,out);
         }
         bmp.recycle();
