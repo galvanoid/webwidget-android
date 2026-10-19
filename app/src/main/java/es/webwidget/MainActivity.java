@@ -42,7 +42,10 @@ public class MainActivity extends Activity {
   desktopMode=settings().getBoolean("desktop",false);
   LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setBackgroundColor(Color.WHITE);
   widgetSelector=new Spinner(this);
-  root.addView(widgetSelector,new LinearLayout.LayoutParams(-1,-2));
+  widgetSelector.setPadding(24,22,24,22);
+  LinearLayout selectorBox=new LinearLayout(this);selectorBox.setPadding(12,28,12,12);
+  selectorBox.addView(widgetSelector,new LinearLayout.LayoutParams(-1,-2));
+  root.addView(selectorBox,new LinearLayout.LayoutParams(-1,-2));
   address=new TextView(this);address.setText(currentUrl);address.setTextColor(Color.BLACK);address.setSingleLine(true);address.setEllipsize(TextUtils.TruncateAt.MIDDLE);address.setPadding(16,14,16,14);
   root.addView(address,new LinearLayout.LayoutParams(-1,-2));
   LinearLayout buttons=new LinearLayout(this);
@@ -65,7 +68,7 @@ public class MainActivity extends Activity {
   zoomControls.addView(zoomLabel,new LinearLayout.LayoutParams(-2,-2));
   zoomControls.addView(zoomBar,new LinearLayout.LayoutParams(0,-2,1));
   root.addView(zoomControls,new LinearLayout.LayoutParams(-1,-2));
-  web=new WebView(this);web.setBackgroundColor(Color.WHITE);web.getSettings().setJavaScriptEnabled(true);web.getSettings().setDomStorageEnabled(true);
+  web=new WebView(this);WidgetProfiles.apply(web,widgetId);web.setBackgroundColor(Color.WHITE);web.getSettings().setJavaScriptEnabled(true);web.getSettings().setDomStorageEnabled(true);
   web.getSettings().setSupportZoom(true);web.getSettings().setBuiltInZoomControls(true);web.getSettings().setDisplayZoomControls(false);
   web.getSettings().setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
   mobileUserAgent=web.getSettings().getUserAgentString();
@@ -106,11 +109,34 @@ public class MainActivity extends Activity {
     address.setText(currentUrl);
     modeButton.setText(desktopMode?"Vista: escritorio":"Vista: móvil");
     zoomBar.setProgress(Math.max(0,Math.min(170,zoomPercent-30)));
-    configureMode();
+    replaceWebView();
     web.loadUrl(currentUrl);
    }
   });
   web.loadUrl(currentUrl);
+ }
+ void replaceWebView(){
+  if(web==null)return;
+  android.view.ViewGroup parent=(android.view.ViewGroup)web.getParent();
+  if(parent==null)return;
+  int index=parent.indexOfChild(web);
+  android.view.ViewGroup.LayoutParams params=web.getLayoutParams();
+  parent.removeView(web);
+  web.stopLoading();
+  web.destroy();
+  web=new WebView(this);
+  WidgetProfiles.apply(web,widgetId);
+  web.setBackgroundColor(Color.WHITE);
+  web.getSettings().setJavaScriptEnabled(true);
+  web.getSettings().setDomStorageEnabled(true);
+  web.getSettings().setSupportZoom(true);
+  web.getSettings().setBuiltInZoomControls(true);
+  web.getSettings().setDisplayZoomControls(false);
+  web.getSettings().setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
+  mobileUserAgent=web.getSettings().getUserAgentString();
+  configureMode();
+  web.setWebViewClient(new WebViewClient(){@Override public void onPageFinished(WebView v,String url){applyViewport();handler.postDelayed(()->{if(web==v){applyZoom();snapshot();}},1800);}});
+  parent.addView(web,index,params);
  }
  void configureMode(){
   WebSettings settings=web.getSettings();
