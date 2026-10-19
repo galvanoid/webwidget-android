@@ -93,7 +93,7 @@ public class MainActivity extends Activity {
   zoomLabel.setText("Zoom "+zoomPercent+"%");
   int[] ids=WidgetSettings.ids(this);
   String[] names=new String[ids.length];
-  for(int i=0;i<ids.length;i++){WidgetSettings.ensure(this,ids[i]);names[i]="Widget "+(i+1)+" — "+WidgetSettings.forId(this,ids[i]).getString("url","https://example.com");}
+  for(int i=0;i<ids.length;i++){WidgetSettings.ensure(this,ids[i]);names[i]="Widget "+(i+1)+" (ID "+ids[i]+")";}
   widgetSelector.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,names));
   widgetSelector.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){
    public void onNothingSelected(AdapterView<?> parent){}
@@ -158,7 +158,6 @@ public class MainActivity extends Activity {
   final float scale=zoomPercent/100f;
   web.evaluateJavascript("(function(){var id='webwidget-zoom';var st=document.getElementById(id);if(!st){st=document.createElement('style');st.id=id;document.head.appendChild(st);}st.textContent='html{zoom:"+String.format(Locale.US,"%.2f",scale)+" !important;}';})();",null);
  }
- int[] idsForSelector(){return WidgetSettings.ids(this);}
  void showUrlDialog(){
   EditText input=new EditText(this);
   input.setSingleLine(true);input.setSelectAllOnFocus(true);
@@ -171,8 +170,6 @@ public class MainActivity extends Activity {
     String u=input.getText().toString().trim();
     if(!(u.startsWith("https://")||u.startsWith("http://"))){Toast.makeText(this,"La URL debe empezar por http:// o https://",Toast.LENGTH_LONG).show();return;}
     currentUrl=u;settings().edit().putString("url",u).apply();address.setText(u);
-    int pos=widgetSelector.getSelectedItemPosition();
-    if(pos>=0){String[] labels=new String[idsForSelector().length];int[] widgetIds=idsForSelector();for(int i=0;i<labels.length;i++)labels[i]="Widget "+(i+1)+" — "+WidgetSettings.forId(this,widgetIds[i]).getString("url","https://example.com");widgetSelector.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,labels));widgetSelector.setSelection(pos);}
     WidgetProvider.refresh(this);web.loadUrl(u);
    }).create();
   dialog.show();input.requestFocus();input.selectAll();
