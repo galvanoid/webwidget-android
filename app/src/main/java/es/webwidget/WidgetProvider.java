@@ -6,6 +6,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
+import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.view.View;
@@ -20,12 +21,13 @@ public class WidgetProvider extends AppWidgetProvider {
  }
  static void render(Context c,AppWidgetManager manager,int id) {
   RemoteViews rv=new RemoteViews(c.getPackageName(),R.layout.widget);
-  rv.setInt(R.id.widget_root,"setBackgroundColor",c.getSharedPreferences("MainActivity",Context.MODE_PRIVATE).getInt("background",android.graphics.Color.WHITE));
-  File file=new File(c.getFilesDir(),"snapshot.png");
+  SharedPreferences prefs=WidgetSettings.forId(c,id);
+  rv.setInt(R.id.widget_root,"setBackgroundColor",prefs.getInt("background",android.graphics.Color.WHITE));
+  File file=new File(c.getFilesDir(),WidgetSettings.snapshotName(id));
   Bitmap bitmap=BitmapFactory.decodeFile(file.getAbsolutePath());
   if(bitmap!=null){rv.setImageViewBitmap(R.id.screenshot,bitmap);rv.setViewVisibility(R.id.empty,View.GONE);}
   else {rv.setViewVisibility(R.id.empty,View.VISIBLE);}
-  String url=c.getSharedPreferences("MainActivity",Context.MODE_PRIVATE).getString("url","https://example.com");
+  String url=prefs.getString("url","https://example.com");
   Intent intent=new Intent(Intent.ACTION_VIEW,Uri.parse(url));
   intent.addCategory(Intent.CATEGORY_BROWSABLE);
   intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -36,5 +38,6 @@ public class WidgetProvider extends AppWidgetProvider {
   rv.setOnClickPendingIntent(R.id.empty,pending);
   manager.updateAppWidget(id,rv);
  }
- @Override public void onUpdate(Context c,AppWidgetManager manager,int[] ids){for(int id:ids)render(c,manager,id);}
+ @Override public void onUpdate(Context c,AppWidgetManager manager,int[] ids){for(int id:ids){WidgetSettings.ensure(c,id);render(c,manager,id);RefreshWorker.schedule(c,id);}}
+ @Override public void onDeleted(Context c,int[] ids){for(int id:ids){RefreshWorker.cancel(c,id);WidgetSettings.delete(c,id);}}
 }
