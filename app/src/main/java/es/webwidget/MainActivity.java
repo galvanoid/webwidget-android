@@ -1,5 +1,7 @@
 package es.webwidget;
 import android.app.Activity;
+import android.appwidget.AppWidgetManager;
+import android.content.SharedPreferences;
 import android.app.AlertDialog;
 import android.os.Bundle;
 import android.os.Handler;
@@ -26,12 +28,22 @@ public class MainActivity extends Activity {
  boolean desktopMode;
  String mobileUserAgent;
  Button modeButton, colorButton, refreshButton;
+ Spinner widgetSelector;
+ int widgetId=AppWidgetManager.INVALID_APPWIDGET_ID;
+ boolean selecting=false;
+ SharedPreferences settings(){return WidgetSettings.forId(this,widgetId);}
  @Override public void onCreate(Bundle state) {
   super.onCreate(state);
-  currentUrl=getPreferences(0).getString("url","https://example.com");
-  zoomPercent=getPreferences(0).getInt("zoom",100);
+  int[] initialIds=WidgetSettings.ids(this);
+  if(initialIds.length==0){new AlertDialog.Builder(this).setMessage("Añade primero un widget a la pantalla de inicio y vuelve aquí para configurarlo.").setPositiveButton("Entendido",(d,w)->finish()).show();return;}
+  widgetId=initialIds[0];
+  WidgetSettings.ensure(this,widgetId);
+  currentUrl=settings().getString("url","https://example.com");
+  zoomPercent=settings().getInt("zoom",100);
   desktopMode=getPreferences(0).getBoolean("desktop",false);
   LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setBackgroundColor(Color.WHITE);
+  widgetSelector=new Spinner(this);
+  root.addView(widgetSelector,new LinearLayout.LayoutParams(-1,-2));
   address=new TextView(this);address.setText(currentUrl);address.setTextColor(Color.BLACK);address.setSingleLine(true);address.setEllipsize(TextUtils.TruncateAt.MIDDLE);address.setPadding(16,14,16,14);
   root.addView(address,new LinearLayout.LayoutParams(-1,-2));
   LinearLayout buttons=new LinearLayout(this);
@@ -47,7 +59,7 @@ public class MainActivity extends Activity {
   refreshButton=new Button(this);refreshButton.setText("Actualización automática");
   root.addView(refreshButton,new LinearLayout.LayoutParams(-1,-2));
   refreshButton.setOnClickListener(v->showRefreshDialog());
-  RefreshWorker.schedule(this);
+  RefreshWorker.schedule(this,widgetId);
   LinearLayout zoomControls=new LinearLayout(this);zoomControls.setOrientation(LinearLayout.HORIZONTAL);
   zoomLabel=new TextView(this);zoomLabel.setTextColor(Color.BLACK);zoomLabel.setPadding(12,12,8,0);
   zoomBar=new SeekBar(this);zoomBar.setMax(170);zoomBar.setProgress(Math.max(0,Math.min(170,zoomPercent-30)));
@@ -80,6 +92,25 @@ public class MainActivity extends Activity {
    public void onStopTrackingTouch(SeekBar b){snapshot();}
   });
   zoomLabel.setText("Zoom "+zoomPercent+"%");
+  int[] ids=WidgetSettings.ids(this);
+  String[] names=new String[ids.length];
+  for(int i=0;i<ids.length;i++){WidgetSettings.ensure(this,ids[i]);names[i]="Widget "+(i+1)+" — "+WidgetSettings.forId(this,ids[i]).getString("url","https://example.com");}
+  widgetSelector.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,names));
+  widgetSelector.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){
+   public void onNothingSelected(AdapterView<?> parent){}
+   public void onItemSelected(AdapterView<?> parent,android.view.View view,int position,long rowId){
+    if(widgetId==ids[position])return;
+    widgetId=ids[position];
+    currentUrl=settings().getString("url","https://example.com");
+    zoomPercent=settings().getInt("zoom",100);
+    desktopMode=settings().getBoolean("desktop",false);
+    address.setText(currentUrl);
+    modeButton.setText(desktopMode?"Vista: escritorio":"Vista: móvil");
+    zoomBar.setProgress(Math.max(0,Math.min(170,zoomPercent-30)));
+    configureMode();
+    web.loadUrl(currentUrl);
+   }
+  });
   web.loadUrl(currentUrl);
  }
  void configureMode(){
@@ -107,7 +138,7 @@ public class MainActivity extends Activity {
   new AlertDialog.Builder(this).setTitle("Actualización automática")
    .setSingleChoiceItems(options,checked,(dialog,which)->{
     getPreferences(0).edit().putInt("interval",values[which]).apply();
-    RefreshWorker.schedule(this);
+    RefreshWorker.schedule(this,widgetId);
     Toast.makeText(this,"Frecuencia: "+options[which],Toast.LENGTH_LONG).show();
     dialog.dismiss();
    }).setNegativeButton("Cancelar",null).show();
@@ -152,7 +183,7 @@ public class MainActivity extends Activity {
   int h=Math.max(1,Math.round(sourceH*factor));
   Bitmap bitmap=Bitmap.createBitmap(w,h,Bitmap.Config.RGB_565);
   Canvas canvas=new Canvas(bitmap);canvas.scale(factor,factor);web.draw(canvas);
-  try(FileOutputStream stream=openFileOutput("snapshot.png",MODE_PRIVATE)){
+  try(FileOutputStream stream=openFileOutput(WidgetSettings.snapshotName(widgetId),MODE_PRIVATE)){
    bitmap.compress(Bitmap.CompressFormat.PNG,85,stream);
    WidgetProvider.refresh(this);
    Toast.makeText(this,"Widget actualizado",Toast.LENGTH_SHORT).show();
