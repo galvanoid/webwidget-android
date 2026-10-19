@@ -5,6 +5,7 @@ import android.app.PendingIntent;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.net.Uri;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.view.View;
@@ -24,8 +25,10 @@ public class WidgetProvider extends AppWidgetProvider {
   Bitmap bitmap=BitmapFactory.decodeFile(file.getAbsolutePath());
   if(bitmap!=null){rv.setImageViewBitmap(R.id.screenshot,bitmap);rv.setViewVisibility(R.id.empty,View.GONE);}
   else {rv.setViewVisibility(R.id.empty,View.VISIBLE);}
-  Intent intent=new Intent(c,MainActivity.class);
-  PendingIntent pending=PendingIntent.getActivity(c,0,intent,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
+  String url=c.getSharedPreferences("MainActivity",Context.MODE_PRIVATE).getString("url","https://example.com");
+  Intent intent=new Intent(Intent.ACTION_VIEW,Uri.parse(url));
+  intent.addCategory(Intent.CATEGORY_BROWSABLE);
+  PendingIntent pending=PendingIntent.getActivity(c,id,intent,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
   rv.setOnClickPendingIntent(R.id.screenshot,pending);
   rv.setOnClickPendingIntent(R.id.empty,pending);
   manager.updateAppWidget(id,rv);
