@@ -53,6 +53,7 @@ public class RefreshWorker extends Worker {
   main.post(()->{
    try{
     WebView web=new WebView(context);view[0]=web;
+    WidgetProfiles.apply(web,id);
     web.setBackgroundColor(Color.WHITE);
     WebSettings settings=web.getSettings();
     settings.setJavaScriptEnabled(true);settings.setDomStorageEnabled(true);
